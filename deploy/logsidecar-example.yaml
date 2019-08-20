@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logsidecar-example
+  labels:
+    app: logsidecar-example
+spec:
+  selector:
+    matchLabels:
+      app: logsidecar-example
+  template:
+    metadata:
+      labels:
+        app: logsidecar-example
+      annotations:
+        logging.kubesphere.io/logsidecar-config: '{"containerLogConfigs":{"testx-app-container":{"datavolume":["log/*.log"]}}}'
+    spec:
+      volumes:
+        - name: datavolume
+          emptyDir: {}
+      containers:
+        # application container
+        - name: app-container
+          image: alpine
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh"]
+          args: ["-c", "if [ ! -d /data/log ];then mkdir -p /data/log;fi; while true; do date >> /data/log/app-test.log; sleep 30;done"]
+          volumeMounts:
+            - name: datavolume
+              mountPath: /data
