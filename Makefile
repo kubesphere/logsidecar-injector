@@ -1,4 +1,4 @@
-IMG ?= logsidecar-injector:latest
+IMG ?= log-sidecar-injector:1.0
 SERVICE_NAME ?= logsidecar-injector
 NAMESPACE ?= kubesphere-logging-system
 
@@ -47,12 +47,9 @@ serve.crt: serve.key
 
 .PHONY: secret
 secret: serve.crt
-	kubectl get secret ${SERVICE_NAME}-service-certs -n ${NAMESPACE} \
-		|| kubectl create secret generic ${SERVICE_NAME}-service-certs -n ${NAMESPACE} \
-		--from-file=${CERTSDIR}/serve.key --from-file=${CERTSDIR}/serve.crt -o yaml --dry-run > deploy/secret.yaml
+	cat deploy/secret.yaml.template | sed 's/<<SERVEKEY>>/$(shell cat ${CERTSDIR}/serve.key | base64 -w 0)/g' \
+		| sed 's/<<SERVECRT>>/$(shell cat ${CERTSDIR}/serve.crt | base64 -w 0)/g' > deploy/secret.yaml
 
 .PHONY: webhook
 webhook: secret
 	cat deploy/webhook.yaml.template | sed 's/<<CACERT>>/$(shell cat ${CERTSDIR}/ca.crt |base64 -w 0)/g' > deploy/webhook.yaml
-
-
