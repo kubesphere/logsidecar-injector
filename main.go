@@ -11,8 +11,11 @@ import (
 func main() {
 	var config injector.Config
 	config.AddFlags()
+	injector.AddFilebeatTmplFlags()
 	klog.InitFlags(nil)
 	flag.Parse()
+
+	injector.InitFilebeatTmpl()
 
 	http.HandleFunc("/", injector.ServeLogSidecarPods)
 

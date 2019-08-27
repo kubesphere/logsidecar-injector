@@ -7,5 +7,7 @@ COPY bin/injector injector
 CMD ["/injector", \
     "-tls-cert-file", "/etc/logsidecar-injector/serve.crt",\
     "-tls-private-key-file", "/etc/logsidecar-injector/serve.key",\
+    "-filebeat-yml-template", "/etc/logsidecar-injector/filebeat/filebeat.yml.template",\
+    "-inputs-yml-template", "/etc/logsidecar-injector/filebeat/inputs.yml.template",\
     "-logtostderr", \
     "-v", "2"]

@@ -1,8 +1,14 @@
 package injector
 
 import (
+	"bufio"
 	"bytes"
+	"flag"
 	"fmt"
+	"os"
+	"regexp"
+	"strings"
+	"text/template"
 )
 
 const (
@@ -11,35 +17,56 @@ const (
 	FilebeatInputsYMLPath = FilebeatConfDir + "/inputs.yml"
 )
 
-// for init filebeat.yml
-var fileBeatYMLInitCMD string
-var filebeatConfLines = []string{
-	"filebeat.config.inputs:",
-	"  enabled: true",
-	"  path: \\${path.config}/inputs.yml",
-	"  reload.enabled: true",
-	"  reload.period: 10s",
-	"output.console:",
-	"  codec.format:",
-	"    string: '%{[message]}'",
-	"logging.level: warning",
+var filebeatYMLTmpl, filebeatInputsYMLTmpl string
+
+var filebeatInputsDataTmpl *template.Template
+
+type FilebeatInputsData struct {
+	Paths []string
 }
 
-// for init inputs.yml
-var filebeatInputsHeadLines = []string{
-	"- type: log",
-	"  paths:"}
-
-func init() {
-	fileBeatYMLInitCMD = generateEchoCMD(filebeatConfLines, FilebeatYMLPath)
+func AddFilebeatTmplFlags() {
+	flag.StringVar(&filebeatYMLTmpl, "filebeat-yml-template", filebeatYMLTmpl, "template for filebeat.yml")
+	flag.StringVar(&filebeatInputsYMLTmpl, "inputs-yml-template", filebeatInputsYMLTmpl, "template for inputs.yml")
 }
 
-func filebeatInputsYMLInitCMD(logAbsPaths []string) string {
-	confLines := filebeatInputsHeadLines[:]
-	for _, path := range logAbsPaths {
-		confLines = append(confLines, "  - "+path)
+var filebeatYMLInitCMD string
+
+func InitFilebeatTmpl() {
+	// generate filebeat.yml init cmd
+	f, err := os.Open(filebeatYMLTmpl)
+	if err != nil {
+		panic(fmt.Errorf("error to open filebeat-yml-template file: %v", err))
 	}
-	return generateEchoCMD(confLines, FilebeatInputsYMLPath)
+	var lines []string
+	r, e := regexp.Compile(`(^|^.*[^\$]{1})(\$)($|[^\$]{1}.*)`) // used to replace single $
+	if e != nil {
+		panic(e)
+	}
+	for b := bufio.NewScanner(f); b.Scan(); {
+		if s := b.Text(); strings.TrimSpace(s) != "" {
+			lines = append(lines, r.ReplaceAllString(s, "$1\\$2$3"))
+		}
+	}
+	filebeatYMLInitCMD = generateEchoCMD(lines, FilebeatYMLPath)
+	// generate template for inputs.yml
+	if filebeatInputsDataTmpl, err = template.ParseFiles(filebeatInputsYMLTmpl); err != nil {
+		panic(fmt.Errorf("error to create tempalte from inputs-yml-template file: %v", err))
+	}
+}
+
+func filebeatInputsYMLInitCMD(logAbsPaths []string) (string, error) {
+	buffer := bytes.NewBufferString("")
+	if err := filebeatInputsDataTmpl.Execute(buffer, &FilebeatInputsData{Paths: logAbsPaths}); err != nil {
+		return "", err
+	}
+	var lines []string
+	for b := bufio.NewScanner(buffer); b.Scan(); {
+		if s := b.Text(); strings.TrimSpace(s) != "" {
+			lines = append(lines, s)
+		}
+	}
+	return generateEchoCMD(lines, FilebeatInputsYMLPath), nil
 }
 
 func generateEchoCMD(lines []string, filePath string) string {
@@ -54,18 +81,19 @@ func generateEchoCMD(lines []string, filePath string) string {
 	return buffer.String()
 }
 
-func FilebeatConfigInitCMD(logAbsPaths []string) string {
-	dirReadyCMD := fmt.Sprintf(
-		"if [ ! -d %s ];then mkdir %s;fi;", FilebeatConfDir, FilebeatConfDir)
-	YMLReadyCMD := fmt.Sprintf(
+func FilebeatConfigInitCMD(logAbsPaths []string) (string, error) {
+	clearCMD := fmt.Sprintf(
 		"if [ -e %s ];then >%s;fi;", FilebeatYMLPath, FilebeatYMLPath)
-	InputsYMLReadyCMD := fmt.Sprintf(
+	inputsClearCMD := fmt.Sprintf(
 		"if [ -e %s ];then >%s;fi;", FilebeatInputsYMLPath, FilebeatInputsYMLPath)
+	inputsYMLInitCMD, err := filebeatInputsYMLInitCMD(logAbsPaths)
+	if err != nil {
+		return "", err
+	}
 	var buffer bytes.Buffer
-	buffer.WriteString(dirReadyCMD)
-	buffer.WriteString(YMLReadyCMD)
-	buffer.WriteString(InputsYMLReadyCMD)
-	buffer.WriteString(fileBeatYMLInitCMD)
-	buffer.WriteString(filebeatInputsYMLInitCMD(logAbsPaths))
-	return buffer.String()
+	buffer.WriteString(clearCMD)
+	buffer.WriteString(inputsClearCMD)
+	buffer.WriteString(filebeatYMLInitCMD)
+	buffer.WriteString(inputsYMLInitCMD)
+	return buffer.String(), nil
 }

@@ -65,7 +65,12 @@ func MutateLogsidecarPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 					return toAdmissionResponse(err)
 				}
 			}
-			addLogsidecarSpec(podSpec, logVolMounts, logAbsPaths)
+			if err = addLogsidecarSpec(podSpec, logVolMounts, logAbsPaths); err != nil {
+				err = fmt.Errorf("faild to inject logsidecar into pod %s: %v", podNN, err)
+				klog.Error(err)
+				return toAdmissionResponse(err)
+			}
+
 		}
 	}
 
@@ -117,7 +122,12 @@ func removeLogsidecarSpec(podSpec *corev1.PodSpec) {
 	}
 }
 
-func addLogsidecarSpec(podSpec *corev1.PodSpec, logVolMounts []corev1.VolumeMount, logAbsPaths []string) {
+func addLogsidecarSpec(podSpec *corev1.PodSpec, logVolMounts []corev1.VolumeMount, logAbsPaths []string) error {
+	configInitCMD, err := FilebeatConfigInitCMD(logAbsPaths)
+	if err != nil {
+		return err
+	}
+
 	confVol := corev1.Volume{
 		Name: lscVolumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -136,7 +146,7 @@ func addLogsidecarSpec(podSpec *corev1.PodSpec, logVolMounts []corev1.VolumeMoun
 		Image:           lscInitImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command:         []string{"/bin/sh"},
-		Args:            []string{"-c", FilebeatConfigInitCMD(logAbsPaths)},
+		Args:            []string{"-c", configInitCMD},
 		VolumeMounts:    []corev1.VolumeMount{confVolMount},
 	}
 	podSpec.InitContainers = append(podSpec.InitContainers, initC)
@@ -159,6 +169,7 @@ func addLogsidecarSpec(podSpec *corev1.PodSpec, logVolMounts []corev1.VolumeMoun
 		VolumeMounts: append(logVolMounts, confVolMount),
 	}
 	podSpec.Containers = append(podSpec.Containers, sidecarC)
+	return nil
 }
 
 func ParseLSCConf(conf *LSCConfig) (logVolMounts []corev1.VolumeMount, logAbsPaths []string) {

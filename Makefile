@@ -22,7 +22,7 @@ docker-build: injector
 
 
 
-CERTSDIR ?= deploy/certs
+CERTSDIR ?= config/certs
 ca.key:
 	openssl genrsa -out ${CERTSDIR}/ca.key 2048
 
@@ -43,7 +43,12 @@ serve.crt: serve.key
 		-CAkey ${CERTSDIR}/ca.key -CAcreateserial \
 		-out ${CERTSDIR}/serve.crt -days 10000 -sha256
 
-
+.PHONY: filebeat
+filebeat:
+	sed 's/^/    /g' config/filebeat.yml.template | sed '$$a\\n' > config/filebeat.yml.tmp
+	sed 's/^/    /g' config/inputs.yml.template | sed '$$a\\n' > config/inputs.yml.tmp
+	cat deploy/configmap.yaml.template | sed '/filebeat.yml.template/r config/filebeat.yml.tmp' \
+        	| sed '/inputs.yml.template/r config/inputs.yml.tmp' > deploy/configmap.yaml
 
 .PHONY: secret
 secret: serve.crt

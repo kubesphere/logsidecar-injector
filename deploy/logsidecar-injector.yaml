@@ -17,6 +17,9 @@ spec:
         - name: service-certs
           secret:
             secretName: logsidecar-injector-service-certs
+        - name: filebeat-config-template
+          configMap:
+            name: logsidecar-injector-configmap
       containers:
         - image: kubespheredev/log-sidecar-injector:1.0
           imagePullPolicy: IfNotPresent
@@ -31,6 +34,8 @@ spec:
           volumeMounts:
             - name: service-certs
               mountPath: /etc/logsidecar-injector
+            - name: filebeat-config-template
+              mountPath: /etc/logsidecar-injector/filebeat
 
 ---
 
