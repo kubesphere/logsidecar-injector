@@ -54,23 +54,24 @@ func MutateLogsidecarPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 				return toAdmissionResponse(err)
 			}
 			logVolMounts, logAbsPaths := ParseLSCConf(lscConfig)
-			vNames := make(map[string]struct{})
-			for _, v := range podSpec.Volumes {
-				vNames[v.Name] = struct{}{}
-			}
-			for _, vm := range logVolMounts {
-				if _, exists := vNames[vm.Name]; !exists {
-					err = fmt.Errorf("unable to find volume(%s) in pod %s", vm.Name, podNN)
+			if len(logVolMounts) > 0 && len(logAbsPaths) > 0 {
+				vNames := make(map[string]struct{})
+				for _, v := range podSpec.Volumes {
+					vNames[v.Name] = struct{}{}
+				}
+				for _, vm := range logVolMounts {
+					if _, exists := vNames[vm.Name]; !exists {
+						err = fmt.Errorf("unable to find volume(%s) in pod %s", vm.Name, podNN)
+						klog.Error(err)
+						return toAdmissionResponse(err)
+					}
+				}
+				if err = addLogsidecarSpec(podSpec, logVolMounts, logAbsPaths); err != nil {
+					err = fmt.Errorf("faild to inject logsidecar into pod %s: %v", podNN, err)
 					klog.Error(err)
 					return toAdmissionResponse(err)
 				}
 			}
-			if err = addLogsidecarSpec(podSpec, logVolMounts, logAbsPaths); err != nil {
-				err = fmt.Errorf("faild to inject logsidecar into pod %s: %v", podNN, err)
-				klog.Error(err)
-				return toAdmissionResponse(err)
-			}
-
 		}
 	}
 
