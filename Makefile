@@ -1,4 +1,6 @@
-IMG ?= log-sidecar-injector:1.0
+TARGET = log-sidecar-injector
+VERSION ?= 1.0
+REGISTRY ?= kubespheredev
 SERVICE_NAME ?= logsidecar-injector
 NAMESPACE ?= kubesphere-logging-system
 
@@ -18,8 +20,12 @@ vet:
 
 # Build the docker image
 docker-build: injector
-	docker build . -t ${IMG}
+	docker build -t $(REGISTRY)/$(TARGET):latest -t $(REGISTRY)/$(TARGET):$(VERSION) .
 
+# Push the docker image
+docker-push:
+	docker push $(REGISTRY)/$(TARGET):latest
+	docker push $(REGISTRY)/$(TARGET):$(VERSION)
 
 
 CERTSDIR ?= config/certs
