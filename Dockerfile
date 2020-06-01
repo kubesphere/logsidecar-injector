@@ -1,13 +1,14 @@
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-#FROM gcr.io/distroless/static:latest
-FROM alpine
+FROM golang:1.13.5 as builder
+WORKDIR /workspace
+COPY . .
+RUN CGO_ENABLED=0 GO111MODULE=on go build -a -o ./bin/injector ./main.go
+
+FROM alpine:3.9
 WORKDIR /
-COPY bin/injector injector
-CMD ["/injector", \
-    "-tls-cert-file", "/etc/logsidecar-injector/serve.crt",\
-    "-tls-private-key-file", "/etc/logsidecar-injector/serve.key",\
-    "-filebeat-yml-template", "/etc/logsidecar-injector/filebeat/filebeat.yml.template",\
-    "-inputs-yml-template", "/etc/logsidecar-injector/filebeat/inputs.yml.template",\
-    "-logtostderr", \
-    "-v", "2"]
+COPY --from=builder /workspace/bin/injector /usr/local/bin/injector
+
+RUN adduser -D -g injector -u 1002 injector && \
+    chown -R injector:injector /usr/local/bin/injector
+USER injector
+
+ENTRYPOINT ["injector"]

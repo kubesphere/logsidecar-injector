@@ -1,9 +1,0 @@
-filebeat.config.inputs:
-  enabled: true
-  path: ${path.config}/inputs.yml
-  reload.enabled: true
-  reload.period: 10s
-output.console:
-  codec.format:
-    string: '%{[message]}'
-logging.level: warning

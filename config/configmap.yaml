@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+data:
+  filebeat.yaml: |-
+    filebeat.inputs:
+      - type: log
+        enabled: true
+        paths:
+        {{range .Paths}}
+        - {{.}}
+        {{end}}
+    output.console:
+      codec.format:
+        string: '%{[log.file.path]} %{[message]}'
+    logging.level: warning
+  sidecar.yaml: |-
+    container:
+      image: elastic/filebeat:6.7.0
+      imagePullPolicy: IfNotPresent
+      resources: {}
+    initContainer:
+      image: alpine:3.9
+      imagePullPolicy: IfNotPresent
+      resources: {}
+metadata:
+  name: configmap
+  namespace: system

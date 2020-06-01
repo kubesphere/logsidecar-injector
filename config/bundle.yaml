@@ -1,0 +1,145 @@
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: logsidecar-injector-admission-mutate
+webhooks:
+- clientConfig:
+    caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURkRENDQWx5Z0F3SUJBZ0lKQUtPSEw0ZEZJdjd3TUEwR0NTcUdTSWIzRFFFQkN3VUFNRTh4Q3pBSkJnTlYKQkFZVEFrTk9NUXN3Q1FZRFZRUUlEQUpJUWpFTE1Ba0dBMVVFQ2d3Q1VVTXhKakFrQmdOVkJBTU1IV3h2WjNOcApaR1ZqWVhJdGFXNXFaV04wYjNJdFlXUnRhWE56YVc5dU1CNFhEVEl3TURReU5qRXdNREl3TTFvWERUUTNNRGt4Ck1qRXdNREl3TTFvd1R6RUxNQWtHQTFVRUJoTUNRMDR4Q3pBSkJnTlZCQWdNQWtoQ01Rc3dDUVlEVlFRS0RBSlIKUXpFbU1DUUdBMVVFQXd3ZGJHOW5jMmxrWldOaGNpMXBibXBsWTNSdmNpMWhaRzFwYzNOcGIyNHdnZ0VpTUEwRwpDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLQW9JQkFRRGJSb0xjWHR0Tm1tV283ZGtLRUNoOUNLN3RtaWh1CmErT1pMMVJNbHo2Mkh2a3lnWHVkUnlHM01iWG1yN0hWdFhKc0Q5Q3J1ZVM3ay85cXBsZVFVcGZlcm43RUYwSFMKbklHUXh5MmR3bVNldHU4d1VWcGpHYjZTNHY5VFFmYnd0SGM1azdWUU91dTlCUHhCblo0UTQwc2FsTjBNQXRtNwpDYS9mWGpqK1RQQVVZbWxCYUZ2aU5OUVBaT29HWjJuRE9VVG8ydDJRYTA0VTkzL1U0TlAydW9Bb1F0b0NTOWs2Ci9yZ2NuVE4vcDFOaUp1b1o5ZjFyZWRvdU1HTXFpcmRLMzBiSWMzUmxaR2lVWW80UHd5OXoyeDREbzdCZmYwUzMKWGJtVlZHbkUyZFVXVVVLWmU1TzVhWEtPU2RHN0d1ODIwOS9QcVlGbkxEMEQ3cHo5dFZMTUs3ZUhBZ01CQUFHagpVekJSTUIwR0ExVWREZ1FXQkJUazNjbkxMWm00SFVjbU9ZbnhWeEtJZkFwemZ6QWZCZ05WSFNNRUdEQVdnQlRrCjNjbkxMWm00SFVjbU9ZbnhWeEtJZkFwemZ6QVBCZ05WSFJNQkFmOEVCVEFEQVFIL01BMEdDU3FHU0liM0RRRUIKQ3dVQUE0SUJBUUFFS0tuMnVMM0Nockw2VjVtTGV3TmFPa0hwakpkREN2bmFEbmdyenZ5dU1tYzFUZ3JYV3d3eApVK2JyemVwZFZvNk9ldXFWK3lTYjBFcjlFdjRiYjFtVlVqVVRpdzdTeUtYR25PaXBUbklwbUZ2VDN3OWNSTmJXCjF4eHJ4UjFiRnErMXVMMkJaV3dNOTQxYnE4SVMxazhGczZoQTZPRDMwMTFkQzh3VWU2K2tEM1lHL2NWSlZzSGwKalhrT09GVENiODZyUE11WkszOExWV3k2Rjd1KzJUUi9yOXRZSWV4dEpJL2JvT1Z2MHpCSFlHZmx3QWpJZkc5SgpGSGFBeG1Fb0dEY2VoQWdKcjBoS0NaWFpjOG9kV3NpYVFvdXRDYWdpR0NpWGEzUzI3SzZUSEFYVEpKN3dNMit0Cmd6MlRObkJMYTZHdlcxY0ZVSHd2TjVhdjBBSGljOXhiCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    service:
+      name: logsidecar-injector-admission
+      namespace: kubesphere-logging-system
+  failurePolicy: Fail
+  name: logsidecar-injector.logging.kubesphere.io
+  namespaceSelector:
+    matchExpressions:
+    - key: logging.kubesphere.io/logsidecar-injection
+      operator: In
+      values:
+      - enabled
+  objectSelector:
+    matchExpressions:
+    - key: logging.kubesphere.io/logsidecar-injector
+      operator: DoesNotExist
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+---
+apiVersion: v1
+data:
+  filebeat.yaml: |-
+    filebeat.inputs:
+      - type: log
+        enabled: true
+        paths:
+        {{range .Paths}}
+        - {{.}}
+        {{end}}
+    output.console:
+      codec.format:
+        string: '%{[log.file.path]} %{[message]}'
+    logging.level: warning
+  sidecar.yaml: |-
+    container:
+      image: elastic/filebeat:6.7.0
+      imagePullPolicy: IfNotPresent
+      resources: {}
+    initContainer:
+      image: alpine:3.9
+      imagePullPolicy: IfNotPresent
+      resources: {}
+kind: ConfigMap
+metadata:
+  name: logsidecar-injector-configmap
+  namespace: kubesphere-logging-system
+---
+apiVersion: v1
+data:
+  server.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURPRENDQWlBQ0NRRExKdTlQRk5DeWt6QU5CZ2txaGtpRzl3MEJBUXNGQURCUE1Rc3dDUVlEVlFRR0V3SkQKVGpFTE1Ba0dBMVVFQ0F3Q1NFSXhDekFKQmdOVkJBb01BbEZETVNZd0pBWURWUVFEREIxc2IyZHphV1JsWTJGeQpMV2x1YW1WamRHOXlMV0ZrYldsemMybHZiakFlRncweU1EQTBNall4TURBeU1ETmFGdzAwTnpBNU1USXhNREF5Ck1ETmFNRzB4Q3pBSkJnTlZCQVlUQWtOT01Rc3dDUVlEVlFRSURBSklRakVMTUFrR0ExVUVDZ3dDVVVNeFJEQkMKQmdOVkJBTU1PMnh2WjNOcFpHVmpZWEl0YVc1cVpXTjBiM0l0WVdSdGFYTnphVzl1TG10MVltVnpjR2hsY21VdApiRzluWjJsdVp5MXplWE4wWlcwdWMzWmpNSUlCSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDCkFRRUF0ZzI1OWJqcU5XakRkK0RmSWI2WU1sK3ZFbWxNL3hWazBsQmwvM1g5OStTakM3bExSNjFjanNvcGV2SzgKT3hGeFBwUlRhTGU3eW9NK1dqc1g3TDZIcmZrU3MxaW9DZkJEVUNkeXhKSGRiTG1MWlBSSWMxUTlLM3hrUUZ0VwpqZDMxN3hUVUVVTFNEbHU3MEp0K2ppSU5uQlFqU3MzSlViTzIyMlhsb3ZZV3VaTHUreTRkMExYeElGUmlxZGhKCklXb2FwK3U3b3EwVENsaWI1Uk01aElaY1QwRGNYcVpWOG9hckJKVXE2SlhDcGFkckxETnlsNFlOQm9Fa040RDcKZjJ5QVZQZnlyeVR2TEdpTU9GSlAzczdlY0RoY0lrUzNDV3d3QzBxY3hNLytQT2h4OVJ1NVM3RE1GbWY4VU5oNgpTWVhMaTh6QTVPNms4S2NZMklPbVRVVmlQd0lEQVFBQk1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRRGFRTHkxCkI3dGVOM2NWZ0tLVVB6c1pVVWo1Vnl5YjBxSnRRV1VLTnlWKzlsZ2tlOUlzRVNCeFJueGpsa2htdUwxM01BOHIKTlY1amZzM3Q4UWpTUVBQQkJIYjE4LzNBcVhPL0FYWGdDZE91bktwM0RudTMyVEF6VFU0T0lLbkVheFh5RkkyZwpFWU8xYXhQcU0ybVlVT1A4YTNRbTRnUzdMMDNaaTdHcWNWdzhvNlUyMVNWc21XREh5amFQRDcwZDdlS2RpSFc0CmF6N0YyWjFiRXhLQTZCbTgybjFXejVKcUFCSVVxYXVCeC9laFpqeWcxRVVNcmpDK2hEM0p4dFBuR3BOaXVkSXcKQk52d3Q5UkdvLzU5eXY0THNpTWNoS09QbUtBKzMwR2xOR3NqZGVOcjVxcnd3dytHYUlNT3V1RVQ2UzFlbGZIRwprd0tiNUl1bllSa1dvemdSCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+  server.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdGcyNTlianFOV2pEZCtEZkliNllNbCt2RW1sTS94VmswbEJsLzNYOTkrU2pDN2xMClI2MWNqc29wZXZLOE94RnhQcFJUYUxlN3lvTStXanNYN0w2SHJma1NzMWlvQ2ZCRFVDZHl4SkhkYkxtTFpQUkkKYzFROUszeGtRRnRXamQzMTd4VFVFVUxTRGx1NzBKdCtqaUlObkJRalNzM0pVYk8yMjJYbG92WVd1Wkx1K3k0ZAowTFh4SUZSaXFkaEpJV29hcCt1N29xMFRDbGliNVJNNWhJWmNUMERjWHFaVjhvYXJCSlVxNkpYQ3BhZHJMRE55Cmw0WU5Cb0VrTjREN2YyeUFWUGZ5cnlUdkxHaU1PRkpQM3M3ZWNEaGNJa1MzQ1d3d0MwcWN4TS8rUE9oeDlSdTUKUzdETUZtZjhVTmg2U1lYTGk4ekE1TzZrOEtjWTJJT21UVVZpUHdJREFRQUJBb0lCQUIyNGNmSmVoTVhCVzUvWApjelhrRXA2dXBqc2dPN1NzL20rak5uT1ZCS2dTaUZlaW9WcUxQOEFEMnUrNmJ1Wkp1NjRXc3VNMms0N0ZERW5ZCnVkZ3BacWNOTVhOYjl0cmdnV3kxYy9RSlNCZTIxcjNkYjNKOGZ4djVTN2lCOE1ocVF2c0w4Rzc4OUtQcGIram4KYWFxMGZucExnMU56OHZqR21RU0tSd25xbU4wa2kreTNINUltRDN3Y2pZQ0F0ZkJoV2t5aDlrM0ozNm1TaGZsMQozQ1M3T0IzaStITFo0dDVLRUdBS294TjZreWJiMm9sQUFSS2ExemU3L2N0VGIzTm9rM0QvclFOeDZZbmZmYXpOCllNcEVsUU1Zd1MwZnJrZndMaTM1RGhoSFplaUZ3dkR0ek5zM2tIRFlWWndlK3hNd1VKK1A4czY0eWR6RG5ONDIKU1RMRW15a0NnWUVBNmluUHVNQlJDQTRMUG5QNkIrbVFVc3ZPWkM1UTlCUXJuUjh6YWlsR1FCN3RMekI2TS85YgpSSTRyQUdrbE5YbngrRmM2T3k1bHZQd3FwOU5UQkRKcmF4K242a3BpTVRMUTlFNUd4ODk4MGlIREZTMXFuYmFwCjBUN1JueksvNE1nT0s0RU93b0ZFdnRMYXF3QWNkV2ZVSTMyRzJBMHM5bC9ocll0V3JocFdhSnNDZ1lFQXh3ZmwKOWdLWXkwRHhnUjZVNkEvdXhkT0sxZEpMZXdZYlpUc1RNUllGQTAwNnFnelZXcm0reHc0amRSLzBGdTlLc3R2Kwp5S2psSHM3TklTd1dpOTdGRFdzRzZQOTBIZWZEOXp2NHI3ZFVqY01Ecjl0K0JDNDJBa3FjMVEycEZETEwrcnIwCk5FaXRZY295Z0lOc01UMDFDL1MwY2hNaFdwYytnRDRBZ0tIUmJTMENnWUJTUktoUEgzb1ltMTZGN1pjdGluaUQKTGtsdjF2bm9GdUlQekxOeW05ZXJsWEg5UDBuZjFOcEs1cXZpOUEzM2tNVmJXOElBb3RkcG95cVZWZUIzdkFNVApXc2JTd0psbzhaS0tFcW81YndOS2pFUU92NnNTaCtkM3RWdE9WRFVua3dHdmRTTXJZT0UzTGJ0WGtxMXM3aktRCjJYd3prY1YzTmM2QyswNVQwcnNDK3dLQmdRQ0t3UVhmdVRXK1ZYdEljZ0tMdWpmVE1NUlVodlJhUXdxc1N6LzQKODRueElGRXFwaUhEeTBTbVQwUUc3b3pqeEZWR1Zqck10M3BzUE80akZ6SnN0cFNYNHlxQkd6NWZidWxlbmkrawppT0hvcHJFV1U2WUowaEdURFdOQzRQQWtCYm5SQmE4a0dCclAxdi9ZT2tjZUdMYTNyQlIwaHNPMC9VWDBiOFUzCjZCZ3h6UUtCZ1FDTG9UQjBqYTdrSWdOUElNRS92UXo2bmFZUHR4T08rUVBnWDFVN1Y4K0JCeTNGRWNjWEFhL2QKT2lXREpxbWZZWTBQdWJBTVpraWt1a3NOK0xNdzdya3kxYW01Vyt0cVorYUlaUDBQSVBqanhxVGhOQVhUM0hKSQpreU50Z0VTZW52MFl5VHVlTDJCN0VjeU4yam4wSTRMVU16RU05ZGRNejlvcVdDeDIvMFltVVE9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+kind: Secret
+metadata:
+  name: logsidecar-injector-admission-certs
+  namespace: kubesphere-logging-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logsidecar-injector-admission
+  namespace: kubesphere-logging-system
+spec:
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    logging.kubesphere.io/logsidecar-injector: logsidecar-injector-deploy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logsidecar-injector-deploy
+  namespace: kubesphere-logging-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      logging.kubesphere.io/logsidecar-injector: logsidecar-injector-deploy
+  template:
+    metadata:
+      labels:
+        logging.kubesphere.io/logsidecar-injector: logsidecar-injector-deploy
+    spec:
+      containers:
+      - image: kubespheredev/log-sidecar-injector:1.1
+        imagePullPolicy: IfNotPresent
+        name: logsidecar-injector
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        volumeMounts:
+        - mountPath: /etc/logsidecar-injector/certs
+          name: certs
+        - mountPath: /etc/logsidecar-injector/config
+          name: config
+        - mountPath: /etc/localtime
+          name: host-time
+      - args:
+        - --volume-dir=/etc/logsidecar-injector/config
+        - --volume-dir=/etc/logsidecar-injector/certs
+        - --webhook-url=http://127.0.0.1:9443/-/reload
+        image: jimmidyson/configmap-reload:v0.3.0
+        name: config-reloader
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        volumeMounts:
+        - mountPath: /etc/logsidecar-injector/certs
+          name: certs
+        - mountPath: /etc/logsidecar-injector/config
+          name: config
+        - mountPath: /etc/localtime
+          name: host-time
+      volumes:
+      - name: certs
+        secret:
+          secretName: logsidecar-injector-admission-certs
+      - configMap:
+          name: logsidecar-injector-configmap
+        name: config
+      - hostPath:
+          path: /etc/localtime
+        name: host-time
