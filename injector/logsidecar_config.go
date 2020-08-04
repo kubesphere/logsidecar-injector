@@ -2,28 +2,47 @@ package injector
 
 import (
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"strings"
+	"sync"
 )
 
 var (
-	lscCpuLimit    = resource.MustParse("100m")
-	lscMemoryLimit = resource.MustParse("100Mi")
-
-	lscCpuRequest    = resource.MustParse("10m")
-	lscMemoryRequest = resource.MustParse("10Mi")
+	injectorConfig *InjectorConfig
+	mutex          sync.Mutex
 )
 
-type LSCConfig struct {
+func ReloadInjectorConfig(c *Config) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	ic, err := c.InjectorConfig()
+	if err != nil {
+		return err
+	}
+	injectorConfig = ic
+	return nil
+}
+func GetInjectorConfig() *InjectorConfig {
+	mutex.Lock()
+	defer mutex.Unlock()
+	return injectorConfig
+}
+
+type ContainerLogConfig struct {
+	ContainerName string
+	VolumeName    string
+	LogPath       string
+}
+
+type LogsidecarConfig struct {
 	ContainerLogConfigs ContainerLogConfigs `json:"containerLogConfigs,omitempty"`
 }
 type ContainerLogConfigs map[string]VolumeLogConfig // key: containerName; value: VolumeLogConfig
-type VolumeLogConfig map[string][]string            // key: volumeName; value: logRelPaths
+type VolumeLogConfig map[string][]string            // key: volumeName; value: logRelativePaths
 
-func decodeLSCConfig(confStr string) (*LSCConfig, error) {
+func decodeLogsidecarConfig(confStr string) (*LogsidecarConfig, error) {
 	confStr = strings.TrimSpace(confStr)
 	if confStr != "" {
-		conf := &LSCConfig{}
+		conf := &LogsidecarConfig{}
 		err := json.Unmarshal([]byte(confStr), conf)
 		if err != nil {
 			conf = nil

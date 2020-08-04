@@ -1,9 +1,0 @@
-- type: log
-  paths:
-{{range .Paths}}
-  - {{.}}
-{{end}}
-  tail_files: true
-  scan_frequency: 1s
-  max_backoff: 1s
-  backoff: 1s

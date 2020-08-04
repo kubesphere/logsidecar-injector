@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy
+  namespace: system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      logging.kubesphere.io/logsidecar-injector: $(INJECTOR_DEPLOY_NAME)
+  template:
+    metadata:
+      labels:
+        logging.kubesphere.io/logsidecar-injector: $(INJECTOR_DEPLOY_NAME)
+    spec:
+      volumes:
+        - name: certs
+          secret:
+            secretName: admission-certs
+        - name: config
+          configMap:
+            name: configmap
+        - hostPath:
+            path: /etc/localtime
+          name: host-time
+      containers:
+        - image: injector
+          imagePullPolicy: IfNotPresent
+          name: logsidecar-injector
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
+              cpu: 10m
+              memory: 10Mi
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/logsidecar-injector/certs
+            - name: config
+              mountPath: /etc/logsidecar-injector/config
+            - mountPath: /etc/localtime
+              name: host-time
+        - name: config-reloader
+          image: configmap-reload
+          args:
+            - --volume-dir=/etc/logsidecar-injector/config
+            - --volume-dir=/etc/logsidecar-injector/certs
+            - --webhook-url=http://127.0.0.1:9443/-/reload
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
+              cpu: 10m
+              memory: 10Mi
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/logsidecar-injector/certs
+            - name: config
+              mountPath: /etc/logsidecar-injector/config
+            - mountPath: /etc/localtime
+              name: host-time
+
+

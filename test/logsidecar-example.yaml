@@ -2,8 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: logsidecar-example
-  labels:
-    app: logsidecar-example
 spec:
   selector:
     matchLabels:
@@ -13,7 +11,7 @@ spec:
       labels:
         app: logsidecar-example
       annotations:
-        logging.kubesphere.io/logsidecar-config: '{"containerLogConfigs":{"testx-app-container":{"datavolume":["log/*.log"]}}}'
+        logging.kubesphere.io/logsidecar-config: '{"containerLogConfigs":{"app-container":{"datavolume":["log/*.log"]}}}'
     spec:
       volumes:
         - name: datavolume
