@@ -1,35 +1,3 @@
-apiVersion: admissionregistration.k8s.io/v1beta1
-kind: MutatingWebhookConfiguration
-metadata:
-  name: logsidecar-injector-admission-mutate
-webhooks:
-- clientConfig:
-    caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURkRENDQWx5Z0F3SUJBZ0lKQUtPSEw0ZEZJdjd3TUEwR0NTcUdTSWIzRFFFQkN3VUFNRTh4Q3pBSkJnTlYKQkFZVEFrTk9NUXN3Q1FZRFZRUUlEQUpJUWpFTE1Ba0dBMVVFQ2d3Q1VVTXhKakFrQmdOVkJBTU1IV3h2WjNOcApaR1ZqWVhJdGFXNXFaV04wYjNJdFlXUnRhWE56YVc5dU1CNFhEVEl3TURReU5qRXdNREl3TTFvWERUUTNNRGt4Ck1qRXdNREl3TTFvd1R6RUxNQWtHQTFVRUJoTUNRMDR4Q3pBSkJnTlZCQWdNQWtoQ01Rc3dDUVlEVlFRS0RBSlIKUXpFbU1DUUdBMVVFQXd3ZGJHOW5jMmxrWldOaGNpMXBibXBsWTNSdmNpMWhaRzFwYzNOcGIyNHdnZ0VpTUEwRwpDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLQW9JQkFRRGJSb0xjWHR0Tm1tV283ZGtLRUNoOUNLN3RtaWh1CmErT1pMMVJNbHo2Mkh2a3lnWHVkUnlHM01iWG1yN0hWdFhKc0Q5Q3J1ZVM3ay85cXBsZVFVcGZlcm43RUYwSFMKbklHUXh5MmR3bVNldHU4d1VWcGpHYjZTNHY5VFFmYnd0SGM1azdWUU91dTlCUHhCblo0UTQwc2FsTjBNQXRtNwpDYS9mWGpqK1RQQVVZbWxCYUZ2aU5OUVBaT29HWjJuRE9VVG8ydDJRYTA0VTkzL1U0TlAydW9Bb1F0b0NTOWs2Ci9yZ2NuVE4vcDFOaUp1b1o5ZjFyZWRvdU1HTXFpcmRLMzBiSWMzUmxaR2lVWW80UHd5OXoyeDREbzdCZmYwUzMKWGJtVlZHbkUyZFVXVVVLWmU1TzVhWEtPU2RHN0d1ODIwOS9QcVlGbkxEMEQ3cHo5dFZMTUs3ZUhBZ01CQUFHagpVekJSTUIwR0ExVWREZ1FXQkJUazNjbkxMWm00SFVjbU9ZbnhWeEtJZkFwemZ6QWZCZ05WSFNNRUdEQVdnQlRrCjNjbkxMWm00SFVjbU9ZbnhWeEtJZkFwemZ6QVBCZ05WSFJNQkFmOEVCVEFEQVFIL01BMEdDU3FHU0liM0RRRUIKQ3dVQUE0SUJBUUFFS0tuMnVMM0Nockw2VjVtTGV3TmFPa0hwakpkREN2bmFEbmdyenZ5dU1tYzFUZ3JYV3d3eApVK2JyemVwZFZvNk9ldXFWK3lTYjBFcjlFdjRiYjFtVlVqVVRpdzdTeUtYR25PaXBUbklwbUZ2VDN3OWNSTmJXCjF4eHJ4UjFiRnErMXVMMkJaV3dNOTQxYnE4SVMxazhGczZoQTZPRDMwMTFkQzh3VWU2K2tEM1lHL2NWSlZzSGwKalhrT09GVENiODZyUE11WkszOExWV3k2Rjd1KzJUUi9yOXRZSWV4dEpJL2JvT1Z2MHpCSFlHZmx3QWpJZkc5SgpGSGFBeG1Fb0dEY2VoQWdKcjBoS0NaWFpjOG9kV3NpYVFvdXRDYWdpR0NpWGEzUzI3SzZUSEFYVEpKN3dNMit0Cmd6MlRObkJMYTZHdlcxY0ZVSHd2TjVhdjBBSGljOXhiCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
-    service:
-      name: logsidecar-injector-admission
-      namespace: kubesphere-logging-system
-  failurePolicy: Fail
-  name: logsidecar-injector.logging.kubesphere.io
-  namespaceSelector:
-    matchExpressions:
-    - key: logging.kubesphere.io/logsidecar-injection
-      operator: In
-      values:
-      - enabled
-  objectSelector:
-    matchExpressions:
-    - key: logging.kubesphere.io/logsidecar-injector
-      operator: DoesNotExist
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    resources:
-    - pods
----
 apiVersion: v1
 data:
   filebeat.yaml: |-
@@ -143,3 +111,38 @@ spec:
       - hostPath:
           path: /etc/localtime
         name: host-time
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: logsidecar-injector-admission-mutate
+webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURkRENDQWx5Z0F3SUJBZ0lKQUtPSEw0ZEZJdjd3TUEwR0NTcUdTSWIzRFFFQkN3VUFNRTh4Q3pBSkJnTlYKQkFZVEFrTk9NUXN3Q1FZRFZRUUlEQUpJUWpFTE1Ba0dBMVVFQ2d3Q1VVTXhKakFrQmdOVkJBTU1IV3h2WjNOcApaR1ZqWVhJdGFXNXFaV04wYjNJdFlXUnRhWE56YVc5dU1CNFhEVEl3TURReU5qRXdNREl3TTFvWERUUTNNRGt4Ck1qRXdNREl3TTFvd1R6RUxNQWtHQTFVRUJoTUNRMDR4Q3pBSkJnTlZCQWdNQWtoQ01Rc3dDUVlEVlFRS0RBSlIKUXpFbU1DUUdBMVVFQXd3ZGJHOW5jMmxrWldOaGNpMXBibXBsWTNSdmNpMWhaRzFwYzNOcGIyNHdnZ0VpTUEwRwpDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLQW9JQkFRRGJSb0xjWHR0Tm1tV283ZGtLRUNoOUNLN3RtaWh1CmErT1pMMVJNbHo2Mkh2a3lnWHVkUnlHM01iWG1yN0hWdFhKc0Q5Q3J1ZVM3ay85cXBsZVFVcGZlcm43RUYwSFMKbklHUXh5MmR3bVNldHU4d1VWcGpHYjZTNHY5VFFmYnd0SGM1azdWUU91dTlCUHhCblo0UTQwc2FsTjBNQXRtNwpDYS9mWGpqK1RQQVVZbWxCYUZ2aU5OUVBaT29HWjJuRE9VVG8ydDJRYTA0VTkzL1U0TlAydW9Bb1F0b0NTOWs2Ci9yZ2NuVE4vcDFOaUp1b1o5ZjFyZWRvdU1HTXFpcmRLMzBiSWMzUmxaR2lVWW80UHd5OXoyeDREbzdCZmYwUzMKWGJtVlZHbkUyZFVXVVVLWmU1TzVhWEtPU2RHN0d1ODIwOS9QcVlGbkxEMEQ3cHo5dFZMTUs3ZUhBZ01CQUFHagpVekJSTUIwR0ExVWREZ1FXQkJUazNjbkxMWm00SFVjbU9ZbnhWeEtJZkFwemZ6QWZCZ05WSFNNRUdEQVdnQlRrCjNjbkxMWm00SFVjbU9ZbnhWeEtJZkFwemZ6QVBCZ05WSFJNQkFmOEVCVEFEQVFIL01BMEdDU3FHU0liM0RRRUIKQ3dVQUE0SUJBUUFFS0tuMnVMM0Nockw2VjVtTGV3TmFPa0hwakpkREN2bmFEbmdyenZ5dU1tYzFUZ3JYV3d3eApVK2JyemVwZFZvNk9ldXFWK3lTYjBFcjlFdjRiYjFtVlVqVVRpdzdTeUtYR25PaXBUbklwbUZ2VDN3OWNSTmJXCjF4eHJ4UjFiRnErMXVMMkJaV3dNOTQxYnE4SVMxazhGczZoQTZPRDMwMTFkQzh3VWU2K2tEM1lHL2NWSlZzSGwKalhrT09GVENiODZyUE11WkszOExWV3k2Rjd1KzJUUi9yOXRZSWV4dEpJL2JvT1Z2MHpCSFlHZmx3QWpJZkc5SgpGSGFBeG1Fb0dEY2VoQWdKcjBoS0NaWFpjOG9kV3NpYVFvdXRDYWdpR0NpWGEzUzI3SzZUSEFYVEpKN3dNMit0Cmd6MlRObkJMYTZHdlcxY0ZVSHd2TjVhdjBBSGljOXhiCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    service:
+      name: logsidecar-injector-admission
+      namespace: kubesphere-logging-system
+  failurePolicy: Fail
+  name: logsidecar-injector.logging.kubesphere.io
+  namespaceSelector:
+    matchExpressions:
+    - key: logging.kubesphere.io/logsidecar-injection
+      operator: In
+      values:
+      - enabled
+  objectSelector:
+    matchExpressions:
+    - key: logging.kubesphere.io/logsidecar-injector
+      operator: DoesNotExist
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+  sideEffects: None

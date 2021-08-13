@@ -20,12 +20,14 @@ spec:
   selector:
     logging.kubesphere.io/logsidecar-injector: $(INJECTOR_DEPLOY_NAME)
 ---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: admission-mutate
 webhooks:
-  - name: logsidecar-injector.logging.kubesphere.io
+  - admissionReviewVersions:
+      - v1beta1
+    name: logsidecar-injector.logging.kubesphere.io
     failurePolicy: Fail
     rules:
       - apiGroups:
@@ -51,3 +53,4 @@ webhooks:
       matchExpressions:
       - key: logging.kubesphere.io/logsidecar-injector
         operator: DoesNotExist
+    sideEffects: None
