@@ -1,5 +1,5 @@
 REPO ?= kubespheredev/log-sidecar-injector
-TAG ?= 1.1
+TAG ?= latest
 SERVICE_NAME ?= logsidecar-injector-admission
 NAMESPACE ?= kubesphere-logging-system
 
@@ -19,11 +19,13 @@ vet:
 
 # Build the docker image
 docker-build:
-	docker build -t $(REPO):latest -t $(REPO):$(TAG) .
+	docker build -t $(REPO):$(TAG) .
+
+docker-cross-build:
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(TAG) .
 
 # Push the docker image
 docker-push:
-	docker push $(REPO):latest
 	docker push $(REPO):$(TAG)
 
 deploy: generate
