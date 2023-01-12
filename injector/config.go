@@ -4,11 +4,12 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"k8s.io/api/core/v1"
 	"sync"
 	"text/template"
+
+	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -85,15 +86,27 @@ func (c *Config) TLSConfig(stop <-chan struct{}, reloadCh <-chan chan error) (*t
 	}, nil
 }
 
-func (c *Config) InjectorConfig() (*InjectorConfig, error) {
-	ic := &InjectorConfig{}
-	scontent, err := ioutil.ReadFile(c.SidecarConfigFile)
+func sidecarConfig(sidecarConfigFile string) (*SidecarConfig, error) {
+	var sidecarConfig SidecarConfig
+	scontent, err := ioutil.ReadFile(sidecarConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	if err = yaml.Unmarshal(scontent, &ic.SidecarConfig); err != nil {
+	if err = yaml.Unmarshal(scontent, &sidecarConfig); err != nil {
 		return nil, err
 	}
+	return &sidecarConfig, nil
+}
+
+func (c *Config) InjectorConfig() (*InjectorConfig, error) {
+	ic := &InjectorConfig{}
+
+	sc, err := sidecarConfig(c.SidecarConfigFile)
+	if err != nil {
+		return nil, err
+	}
+	ic.SidecarConfig = *sc
+
 	tmpl, err := template.ParseFiles(c.FilebeatConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("error to parse %s to tempalte: %v", c.FilebeatConfigFile, err)
