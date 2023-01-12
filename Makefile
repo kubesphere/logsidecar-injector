@@ -1,5 +1,7 @@
-REPO ?= kubespheredev/log-sidecar-injector
-TAG ?= latest
+REPO ?= kubesphere
+TAG ?= $(shell cat VERSION | tr -d " \t\n\r")
+IMAGE = $(REPO)/log-sidecar-injector:$(TAG)
+
 SERVICE_NAME ?= logsidecar-injector-admission
 NAMESPACE ?= kubesphere-logging-system
 
@@ -19,14 +21,14 @@ vet:
 
 # Build the docker image
 docker-build:
-	docker build -t $(REPO):$(TAG) .
+	docker build -t $(IMAGE) .
 
 docker-cross-build:
-	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(TAG) .
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(IMAGE) .
 
 # Push the docker image
 docker-push:
-	docker push $(REPO):$(TAG)
+	docker push $(IMAGE)
 
 deploy: generate
 	kubectl apply -f config/bundle.yaml
@@ -38,5 +40,5 @@ update-cert: ca-secret
 	./hack/update-cert.sh
 
 generate:
-	cd config && $(GOBIN)/kustomize edit set image injector=$(REPO):$(TAG)
+	cd config && $(GOBIN)/kustomize edit set image injector=$(IMAGE)
 	$(GOBIN)/kustomize build config > config/bundle.yaml
