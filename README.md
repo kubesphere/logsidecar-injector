@@ -7,7 +7,7 @@ Logsidecar-injector is a Kubernetes mutating webhook server that adds a sidecar 
 To quickly install the logsidecar injector inside a cluster, just run the following command:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kubesphere/logsidecar-injector/master/config/bundle.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubesphere/logsidecar-injector/release-1.2/config/bundle.yaml
 ```
 > Note: it is default to install into the namespace `kubesphere-logging-system`
 

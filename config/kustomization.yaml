@@ -39,6 +39,6 @@ images:
   newTag: v0.3.0
 - name: injector
   newName: kubesphere/log-sidecar-injector
-  newTag: latest
+  newTag: v1.2.0
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
