@@ -38,7 +38,7 @@ images:
   newName: jimmidyson/configmap-reload
   newTag: v0.3.0
 - name: injector
-  newName: kubespheredev/log-sidecar-injector
-  newTag: "1.1"
+  newName: kubesphere/log-sidecar-injector
+  newTag: latest
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
