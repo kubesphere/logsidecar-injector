@@ -64,7 +64,7 @@ spec:
         logging.kubesphere.io/logsidecar-injector: logsidecar-injector-deploy
     spec:
       containers:
-      - image: kubesphere/log-sidecar-injector:latest
+      - image: kubesphere/log-sidecar-injector:v1.2.0
         imagePullPolicy: IfNotPresent
         name: logsidecar-injector
         resources:
