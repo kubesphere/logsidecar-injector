@@ -13,14 +13,41 @@ data:
         string: '%{[log.file.path]} %{[message]}'
     logging.level: warning
   sidecar.yaml: |-
-    container:
+    filebeatContainer:
       image: elastic/filebeat:6.7.0
+      imagePullPolicy: IfNotPresent
+      resources: {}
+    vectorContainer:
+      image: timberio/vector:0.34.1-debian
       imagePullPolicy: IfNotPresent
       resources: {}
     initContainer:
       image: alpine:3.9
       imagePullPolicy: IfNotPresent
       resources: {}
+  vector.yaml: |-
+    data_dir: /etc/logsidecar
+    sources:
+      logs:
+        include:
+        {{range .Paths}}
+        - {{.}}
+        {{end}}
+        max_line_bytes: 1048576
+        type: file
+    sinks:
+      console:
+        encoding:
+          codec: csv
+          csv:
+            delimiter: ' '
+            fields:
+            - file
+            - message
+            quote_style: never
+        inputs:
+        - logs
+        type: console
 kind: ConfigMap
 metadata:
   name: logsidecar-injector-configmap

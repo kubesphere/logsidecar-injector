@@ -1,6 +1,27 @@
 apiVersion: v1
 kind: ConfigMap
 data:
+  vector.yaml: |-
+    data_dir: /etc/logsidecar
+    sources:
+      logs:
+        include:
+        {{range .Paths}}
+        - {{.}}
+        {{end}}
+        max_line_bytes: 1048576
+        type: file
+    sinks:
+      console:
+        encoding:
+          codec: csv
+          csv:
+            delimiter: ' '
+            fields:
+            - message
+        inputs:
+        - logs
+        type: console
   filebeat.yaml: |-
     filebeat.inputs:
       - type: log
@@ -14,8 +35,12 @@ data:
         string: '%{[log.file.path]} %{[message]}'
     logging.level: warning
   sidecar.yaml: |-
-    container:
+    filebeatContainer:
       image: elastic/filebeat:6.7.0
+      imagePullPolicy: IfNotPresent
+      resources: {}
+    vectorContainer:
+      image: timberio/vector:0.34.1-debian
       imagePullPolicy: IfNotPresent
       resources: {}
     initContainer:
