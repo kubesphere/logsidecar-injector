@@ -13,16 +13,22 @@ import (
 )
 
 const (
-	SidecarContainerDefaultImage     = "elastic/filebeat:6.7.0"
-	SidecarInitContainerDefaultImage = "alpine:3.9"
+	SidecarTypeFilebeat                  = "filebeat"
+	SidecarTypeVector                    = "vector"
+	SidecarContainerDefaultFilebeatImage = "elastic/filebeat:6.7.0"
+	SidecarContainerDefaultVectorImage   = "timberio/vector:0.34.1-distroless-static"
+	SidecarInitContainerDefaultImage     = "alpine:3.9"
 )
 
 type Config struct {
 	CertFile string
 	KeyFile  string
 
+	SidecarType string
+
 	FilebeatConfigFile string
 	SidecarConfigFile  string
+	VectorConfigFile   string
 }
 
 type ContainerConfig struct {
@@ -32,13 +38,16 @@ type ContainerConfig struct {
 }
 
 type SidecarConfig struct {
-	InitContainer ContainerConfig `json:"initContainer" yaml:"initContainer"`
-	Container     ContainerConfig `json:"container" yaml:"container"`
+	InitContainer     ContainerConfig `json:"initContainer" yaml:"initContainer"`
+	FilebeatContainer ContainerConfig `json:"filebeatContainer,omitempty" yaml:"filebeatContainer,omitempty"`
+	VectorContainer   ContainerConfig `json:"vectorContainer,omitempty" yaml:"vectorContainer,omitempty"`
 }
 
 type InjectorConfig struct {
+	SidecarType            string
 	SidecarConfig          SidecarConfig
 	FilebeatConfigTemplate *template.Template
+	VectorConfigTemplate   *template.Template
 }
 
 func (c *Config) AddFlags() {
@@ -46,11 +55,13 @@ func (c *Config) AddFlags() {
 		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated after server cert).")
 	flag.StringVar(&c.KeyFile, "tls-private-key-file", "/etc/logsidecar-injector/certs/server.key",
 		"File containing the default x509 private key matching --tls-cert-file.")
-
+	flag.StringVar(&c.SidecarType, "sidecar-type", SidecarTypeVector, "Type of sidecar to inject. Supported values: filebeat, vector")
 	flag.StringVar(&c.SidecarConfigFile, "sidecar-config-file", "/etc/logsidecar-injector/config/sidecar.yaml",
 		"File containing config of injected containers etc.")
 	flag.StringVar(&c.FilebeatConfigFile, "filebeat-config-file", "/etc/logsidecar-injector/config/filebeat.yaml",
 		"File containing filebeat config")
+	flag.StringVar(&c.VectorConfigFile, "vector-config-file", "/etc/logsidecar-injector/config/vector.yaml",
+		"File containing vector config")
 }
 
 func (c *Config) TLSConfig(stop <-chan struct{}, reloadCh <-chan chan error) (*tls.Config, error) {
@@ -99,7 +110,9 @@ func sidecarConfig(sidecarConfigFile string) (*SidecarConfig, error) {
 }
 
 func (c *Config) InjectorConfig() (*InjectorConfig, error) {
-	ic := &InjectorConfig{}
+	ic := &InjectorConfig{
+		SidecarType: c.SidecarType,
+	}
 
 	sc, err := sidecarConfig(c.SidecarConfigFile)
 	if err != nil {
@@ -107,16 +120,31 @@ func (c *Config) InjectorConfig() (*InjectorConfig, error) {
 	}
 	ic.SidecarConfig = *sc
 
-	tmpl, err := template.ParseFiles(c.FilebeatConfigFile)
-	if err != nil {
-		return nil, fmt.Errorf("error to parse %s to tempalte: %v", c.FilebeatConfigFile, err)
+	if c.SidecarType == SidecarTypeVector {
+		vectorTmpl, err := template.ParseFiles(c.VectorConfigFile)
+		if err != nil {
+			return nil, fmt.Errorf("error to parse %s to tempalte: %v", c.VectorConfigFile, err)
+		}
+		ic.VectorConfigTemplate = vectorTmpl
+		if ic.SidecarConfig.VectorContainer.Image == "" {
+			ic.SidecarConfig.VectorContainer.Image = SidecarContainerDefaultVectorImage
+		}
+	} else if c.SidecarType == SidecarTypeFilebeat {
+		filebeatTmpl, err := template.ParseFiles(c.FilebeatConfigFile)
+		if err != nil {
+			return nil, fmt.Errorf("error to parse %s to tempalte: %v", c.FilebeatConfigFile, err)
+		}
+		ic.FilebeatConfigTemplate = filebeatTmpl
+		if ic.SidecarConfig.FilebeatContainer.Image == "" {
+			ic.SidecarConfig.FilebeatContainer.Image = SidecarContainerDefaultFilebeatImage
+		}
+	} else {
+		return nil, fmt.Errorf("sidecar type %s not supported", c.SidecarType)
 	}
-	ic.FilebeatConfigTemplate = tmpl
-	if ic.SidecarConfig.Container.Image == "" {
-		ic.SidecarConfig.Container.Image = SidecarContainerDefaultImage
-	}
+
 	if ic.SidecarConfig.InitContainer.Image == "" {
 		ic.SidecarConfig.InitContainer.Image = SidecarInitContainerDefaultImage
 	}
+
 	return ic, nil
 }

@@ -17,6 +17,7 @@ import (
 const (
 	logsidecarAnnotationName              = "logging.kubesphere.io/logsidecar-config"
 	logsidecarFilebeatPatchAnnotationName = "logging.kubesphere.io/logsidecar-filebeat-config-jsonpatch"
+	logsidecarVectorPatchAnnotationName   = "logging.kubesphere.io/logsidecar-vector-config-jsonpatch"
 	logsidecarInitContainerName           = "logsidecar-init-container-logging-kubesphere-io"
 	logsidecarContainerName               = "logsidecar-container-logging-kubesphere-io"
 	logsidecarVolumeName                  = "logsidecar-config-volume-logging-kubesphere-io"
@@ -54,9 +55,8 @@ func MutateLogsidecarPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 				klog.Error(err)
 				return toAdmissionResponse(err)
 			}
-			filebeatJsonPatch, _ := pod.Annotations[logsidecarFilebeatPatchAnnotationName]
 
-			if err = addLogsidecarPart(podSpec, lscConfig, filebeatJsonPatch); err != nil {
+			if err = addLogsidecarPart(&pod, lscConfig); err != nil {
 				err = fmt.Errorf("faild to inject logsidecar into pod %s: %v", podNN, err)
 				klog.Error(err)
 				return toAdmissionResponse(err)
@@ -115,11 +115,12 @@ func removeLogsidecarPart(podSpec *corev1.PodSpec) {
 const (
 	logsidecarConfigDir    = "/etc/logsidecar"
 	filebeatConfigFileName = "filebeat.yaml"
+	vectorConfigFileName   = "vector.yaml"
 )
 
-func addLogsidecarPart(podSpec *corev1.PodSpec, conf *LogsidecarConfig, filebeatJsonPatch string) error {
+func addLogsidecarPart(pod *corev1.Pod, conf *LogsidecarConfig) error {
 	cvmMap := make(map[string]map[string]string) // containerName: volumeName: mountPath
-	for _, c := range podSpec.Containers {
+	for _, c := range pod.Spec.Containers {
 		if len(c.VolumeMounts) == 0 {
 			continue
 		}
@@ -157,24 +158,32 @@ func addLogsidecarPart(podSpec *corev1.PodSpec, conf *LogsidecarConfig, filebeat
 	}
 
 	iconfig := GetInjectorConfig()
+	tmpl := iconfig.VectorConfigTemplate
+	jsonPatch, _ := pod.Annotations[logsidecarVectorPatchAnnotationName]
+	configFile := vectorConfigFileName
+	if iconfig.SidecarType == SidecarTypeFilebeat {
+		tmpl = iconfig.FilebeatConfigTemplate
+		jsonPatch, _ = pod.Annotations[logsidecarFilebeatPatchAnnotationName]
+		configFile = filebeatConfigFileName
+	}
 
 	// echo command writes filebeat config to volume shared by filebeat container
 	var buffer bytes.Buffer
-	if err := iconfig.FilebeatConfigTemplate.Execute(&buffer, struct {
+	if err := tmpl.Execute(&buffer, struct {
 		Paths []string
 	}{filebeatLogPaths}); err != nil {
 		return err
 	}
-	fbConfigYaml := buffer.String()
-	if filebeatJsonPatch = strings.TrimSpace(filebeatJsonPatch); filebeatJsonPatch != "" {
-		newYaml, err := PatchYaml(fbConfigYaml, filebeatJsonPatch)
+	configYaml := buffer.String()
+	if jsonPatch = strings.TrimSpace(jsonPatch); jsonPatch != "" {
+		newYaml, err := PatchYaml(configYaml, jsonPatch)
 		if err != nil {
 			return err
 		}
-		fbConfigYaml = newYaml
+		configYaml = newYaml
 	}
-	fbConfigEcho := JoinLines(fbConfigYaml, "echo \"",
-		fmt.Sprintf("\" >> %s/%s ; ", logsidecarConfigDir, filebeatConfigFileName))
+	configEcho := JoinLines(configYaml, "echo \"",
+		fmt.Sprintf("\" >> %s/%s ; ", logsidecarConfigDir, configFile))
 
 	logsidecarVolume := corev1.Volume{
 		Name:         logsidecarVolumeName,
@@ -184,22 +193,30 @@ func addLogsidecarPart(podSpec *corev1.PodSpec, conf *LogsidecarConfig, filebeat
 		Name:      logsidecarVolumeName,
 		MountPath: logsidecarConfigDir,
 	}
-	podSpec.Volumes = append(podSpec.Volumes, logsidecarVolume)
-	podSpec.InitContainers = append(podSpec.InitContainers, corev1.Container{
+	pod.Spec.Volumes = append(pod.Spec.Volumes, logsidecarVolume)
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 		Name:            logsidecarInitContainerName,
 		Image:           iconfig.SidecarConfig.InitContainer.Image,
 		ImagePullPolicy: iconfig.SidecarConfig.InitContainer.ImagePullPolicy,
 		Resources:       iconfig.SidecarConfig.InitContainer.Resources,
 		Command:         []string{"/bin/sh"},
-		Args:            []string{"-c", fbConfigEcho},
+		Args:            []string{"-c", configEcho},
 		VolumeMounts:    []corev1.VolumeMount{logsidecarVolumeMount},
 	})
-	podSpec.Containers = append(podSpec.Containers, corev1.Container{
+	image := iconfig.SidecarConfig.VectorContainer.Image
+	imagePullPolicy := iconfig.SidecarConfig.VectorContainer.ImagePullPolicy
+	resources := iconfig.SidecarConfig.VectorContainer.Resources
+	if iconfig.SidecarType == SidecarTypeFilebeat {
+		image = iconfig.SidecarConfig.FilebeatContainer.Image
+		imagePullPolicy = iconfig.SidecarConfig.FilebeatContainer.ImagePullPolicy
+		resources = iconfig.SidecarConfig.FilebeatContainer.Resources
+	}
+	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
 		Name:            logsidecarContainerName,
-		Image:           iconfig.SidecarConfig.Container.Image,
-		ImagePullPolicy: iconfig.SidecarConfig.Container.ImagePullPolicy,
-		Resources:       iconfig.SidecarConfig.Container.Resources,
-		Args:            []string{"-c", fmt.Sprintf("%s/%s", logsidecarConfigDir, filebeatConfigFileName)},
+		Image:           image,
+		ImagePullPolicy: imagePullPolicy,
+		Resources:       resources,
+		Args:            []string{"-c", fmt.Sprintf("%s/%s", logsidecarConfigDir, configFile)},
 		VolumeMounts:    append(volumeMounts, logsidecarVolumeMount),
 	})
 	return nil
