@@ -30,13 +30,18 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
 			body = data
+		} else {
+			err = fmt.Errorf("fail to read request body: %v", err)
+			klog.Error(err)
+			return
 		}
 	}
 
 	// verify the content type is accurate
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/json" {
-		klog.Errorf("contentType=%s, expect application/json", contentType)
+		err := fmt.Errorf("contentType=%s, expect application/json", contentType)
+		klog.Error(err)
 		return
 	}
 
@@ -50,6 +55,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(body, nil, &requestedAdmissionReview); err != nil {
+		err = fmt.Errorf("fail to decode admission request: %v", err)
 		klog.Error(err)
 		responseAdmissionReview.Response = toAdmissionResponse(err)
 	} else {
@@ -64,9 +70,11 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 
 	respBytes, err := json.Marshal(responseAdmissionReview)
 	if err != nil {
+		err = fmt.Errorf("fail to return json encodeing of admission response: %v", contentType)
 		klog.Error(err)
 	}
-	if _, err := w.Write(respBytes); err != nil {
+	if _, err = w.Write(respBytes); err != nil {
+		err = fmt.Errorf("fail to write the data to the connection: %v", err)
 		klog.Error(err)
 	}
 }

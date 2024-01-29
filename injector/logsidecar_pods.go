@@ -36,6 +36,7 @@ func MutateLogsidecarPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 	pod := corev1.Pod{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &pod); err != nil {
+		err = fmt.Errorf("fail to decode admission request: %v", err)
 		klog.Error(err)
 		return toAdmissionResponse(err)
 	}
